@@ -1,0 +1,108 @@
+---
+title: "Course Project for Practical Machine Learning"
+author: "Francesco Grande"
+date: "19 gennaio 2015"
+output: html_document
+---
+##The choice of the machine learning algorithm
+
+###The available data set
+We are given a very large data set with a lot of rows (19622) and a remarkable number of features (160). The goal is to predict the feature "classe" using some of the other given features. The variable "classe" is a factor variable that can take 5 different values, corresponding to 5 different activities.
+Some of the features are really useless to describe our model since most (or all) values are NA. In the code section we will get rid of such features. Nevertheless many features (53) are still left.
+
+###Random forest algorithm
+A very good choice to capture the model seems to be the random forest algorithm: this algorithm is indeed very good for determining a factor variable and moreover we have enough data (19622) to divide in the proper training set and the cross validation set (really important to check whether the random forest algorithm works)
+
+###Expected out-of-sample error
+The cross validation set allows to evaluate how good is our model description. Indeed the out-of-sample error will be the proportion of correct prediction of the model on the cross validation set. This is also called accuracy of the algorithm. The accuracy of the random forest algorithm in our model turns out to be extremely good: 99,4%.
+
+##Code
+
+Load the needed packages:
+
+```{r,results='hide'}
+library(caret)
+library(randomForest)
+```
+
+Import the data sets:
+
+```{r}
+training_complete<-read.csv(file="/Users/fgrande/Desktop/personal/pml-training.csv",na.strings=c("NA","#DIV/0!", ""))
+test_complete<-read.csv(file="/Users/fgrande/Desktop/personal/pml-testing.csv",na.strings=c("NA","#DIV/0!", ""))
+```
+
+Analyze the training data frame:
+
+```{r}
+dim(training_complete)
+names(training_complete)
+```
+
+Check the distribution of the variable "classe":
+
+```{r}
+plot(training_complete$classe, col="red", main="Distribution of the activities", xlab="classe levels", ylab="Frequency")
+```
+
+Remove the first 7 columns from both data frames, since not useful to the prediction:
+
+```{r}
+training_complete<- training_complete[,-c(1:7)]
+test_complete<- test_complete[,-c(1:7)]
+```
+
+Define a function that counts for each column of a data frame the number of Non Assigned values:
+
+```{r, results='hide'}
+nas <- function(x) {
+    as.vector(apply(x, 2, function(x) length(which(is.na(x)))))
+}
+```
+
+See how many NA values there are for each columns of the datasets:
+
+```{r}
+NAcount_training <- nas(training_complete)
+NAcount_test <- nas(test_complete)
+```
+
+Looking at the results, we decide to consider only features that do not have NA values and forget about the other features:
+
+```{r}
+v<- NAcount_training==0
+w<- NAcount_test==0
+length(which(v==TRUE))
+length(which(w==TRUE))
+training_sel <- training_complete[ ,v]
+test_sel<- test_complete[ ,w]
+```
+
+Set the seed to 12345 for reproducibility and divide the training set into training data for the model (75%) and data for cross-validation (25%):
+
+```{r}
+set.seed(12345)
+inTrain <- createDataPartition(training_sel$classe, p=0.75, list=FALSE)
+training <- training_sel[inTrain,]
+validating <- training_sel[-inTrain,]
+```
+
+Train the model using the random forest algorithm:
+
+```{r}
+model <- randomForest(classe~.,data=training)
+```
+
+Predict the values for the cross validation set and compare the predictions with the actual values of the variable "classe". This provides the accuracy of out model:
+
+```{r}
+predict_valid <- predict(model, newdata=validating)
+confusionMatrix(predict_valid,validating$classe)
+```
+
+Predict the values for the test set:
+```{r}
+predict_test <- predict(model, newdata=test_sel)
+predict_test
+```
+
